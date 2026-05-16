@@ -1,12 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+namespace FB.Shared.Constants;
 
-namespace FB.Shared.Constants
+public static class KafkaTopics
 {
-    internal class KafkaTopics
-    {
-    }
+    public const string RawEvents = "raw_events";
+    public const string ReplyCommands = "reply_commands";
+    public const string SendRetry = "send_retry";
+    public const string SendFailed = "send_failed";
+    public const string DeadLetter = "dead_letter";
 }

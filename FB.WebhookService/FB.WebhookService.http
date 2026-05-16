@@ -1,6 +1,10 @@
-@FB.WebhookService_HostAddress = http://localhost:5254
+@FB.WebhookService_HostAddress = http://localhost:3001
+@verifyToken = replace-with-facebook-verify-token
 
-GET {{FB.WebhookService_HostAddress}}/weatherforecast/
+GET {{FB.WebhookService_HostAddress}}/health
 Accept: application/json
 
 ###
+
+GET {{FB.WebhookService_HostAddress}}/webhook?hub.mode=subscribe&hub.verify_token={{verifyToken}}&hub.challenge=123456
+Accept: text/plain

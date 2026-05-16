@@ -1,6 +1,42 @@
-@FB.BackendAPI_HostAddress = http://localhost:5170
+@FB.BackendAPI_HostAddress = http://localhost:3000
+@adminToken = FB_ADMIN_TOKEN_2026
+@commentId = 987654321
 
-GET {{FB.BackendAPI_HostAddress}}/weatherforecast/
+GET {{FB.BackendAPI_HostAddress}}/health
 Accept: application/json
 
 ###
+
+GET {{FB.BackendAPI_HostAddress}}/api/facebook/posts?limit=5
+Accept: application/json
+X-Admin-Token: {{adminToken}}
+
+###
+
+POST {{FB.BackendAPI_HostAddress}}/api/facebook/posts
+Content-Type: application/json
+X-Admin-Token: {{adminToken}}
+
+{
+  "message": "Bai viet duoc tao tu backend proxy."
+}
+
+###
+
+POST {{FB.BackendAPI_HostAddress}}/api/facebook/comments/{{commentId}}/reply
+Content-Type: application/json
+X-Admin-Token: {{adminToken}}
+
+{
+  "message": "Cam on ban, shop da nhan duoc binh luan."
+}
+
+###
+
+POST {{FB.BackendAPI_HostAddress}}/api/facebook/comments/{{commentId}}/hide
+Content-Type: application/json
+X-Admin-Token: {{adminToken}}
+
+{
+  "isHidden": true
+}

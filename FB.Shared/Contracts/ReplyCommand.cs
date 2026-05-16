@@ -1,12 +1,21 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+namespace FB.Shared.Contracts;
 
-namespace FB.Shared.Contracts
+public sealed record ReplyCommand
 {
-    internal class ReplyCommand
-    {
-    }
+    public int SchemaVersion { get; init; } = 1;
+    public string CommandId { get; init; } = string.Empty;
+    public string EventId { get; init; } = string.Empty;
+    public string Action { get; init; } = string.Empty;
+    public ReplyTarget Target { get; init; } = new();
+    public string? ReplyText { get; init; }
+    public string? Intent { get; init; }
+    public string? Sentiment { get; init; }
+    public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
+}
+
+public sealed record ReplyTarget
+{
+    public string PageId { get; init; } = string.Empty;
+    public string? CommentId { get; init; }
+    public string? PostId { get; init; }
 }

@@ -1,15 +1,70 @@
+using System.Net;
+using System.Text.Json;
+using FB.BackendAPI.Auth;
+using FB.BackendAPI.Middleware;
+using FB.BackendAPI.Options;
+using FB.BackendAPI.Services;
+using FB.Shared.Configuration;
+using FB.Shared.Kafka;
+using Microsoft.OpenApi.Models;
+
+DotEnvLoader.LoadFromRepositoryRoot();
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-
 builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.AddSecurityDefinition("AdminToken", new OpenApiSecurityScheme
+    {
+        Description = "Nhap admin token vao day (FB_ADMIN_TOKEN_2026)",
+        Name = "X-Admin-Token",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.ApiKey
+    });
+
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "AdminToken"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
+
+builder.Services.Configure<FacebookGraphOptions>(builder.Configuration.GetSection(FacebookGraphOptions.SectionName));
+builder.Services.Configure<DashboardAuthOptions>(builder.Configuration.GetSection(DashboardAuthOptions.SectionName));
+
+builder.Services.AddKafkaProducer(builder.Configuration);
+builder.Services.AddSingleton<ICommandIdempotencyStore, InMemoryCommandIdempotencyStore>();
+builder.Services.AddSingleton<AdminTokenAuthFilter>();
+builder.Services.AddScoped<IFacebookCommandService, FacebookCommandService>();
+
+builder.Services.AddHttpClient<IFacebookGraphService, FacebookGraphService>((serviceProvider, client) =>
+{
+    var options = serviceProvider.GetRequiredService<IConfiguration>()
+        .GetSection(FacebookGraphOptions.SectionName)
+        .Get<FacebookGraphOptions>() ?? new FacebookGraphOptions();
+
+    client.BaseAddress = new Uri($"https://graph.facebook.com/{options.GraphVersion}/");
+    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+}).ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+{
+    AutomaticDecompression = DecompressionMethods.All
+});
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -17,9 +72,13 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
-app.UseAuthorization();
-
 app.MapControllers();
+
+app.MapGet("/health", () => Results.Ok(new
+{
+    service = "backend-api",
+    status = "healthy",
+    timestamp = DateTimeOffset.UtcNow
+}));
 
 app.Run();

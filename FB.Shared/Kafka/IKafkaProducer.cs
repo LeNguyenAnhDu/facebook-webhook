@@ -1,12 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+namespace FB.Shared.Kafka;
 
-namespace FB.Shared.Kafka
+public interface IKafkaProducer
 {
-    internal class IKafkaProducer
-    {
-    }
+    Task ProduceAsync<TMessage>(string topic, TMessage message, CancellationToken cancellationToken = default);
 }

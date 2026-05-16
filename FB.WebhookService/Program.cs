@@ -1,15 +1,22 @@
+using FB.Shared.Configuration;
+using FB.Shared.Kafka;
+using FB.WebhookService.Options;
+using FB.WebhookService.Services;
+
+DotEnvLoader.LoadFromRepositoryRoot();
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-
 builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.Configure<FacebookWebhookOptions>(builder.Configuration.GetSection(FacebookWebhookOptions.SectionName));
+builder.Services.AddKafkaProducer(builder.Configuration);
+builder.Services.AddScoped<IFacebookWebhookSignatureValidator, FacebookWebhookSignatureValidator>();
+builder.Services.AddScoped<IFacebookWebhookEventNormalizer, FacebookWebhookEventNormalizer>();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -17,9 +24,12 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
-app.UseAuthorization();
-
 app.MapControllers();
+app.MapGet("/health", () => Results.Ok(new
+{
+    service = "webhook-service",
+    status = "healthy",
+    timestamp = DateTimeOffset.UtcNow
+}));
 
 app.Run();

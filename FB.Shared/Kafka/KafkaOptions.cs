@@ -1,12 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+namespace FB.Shared.Kafka;
 
-namespace FB.Shared.Kafka
+public sealed class KafkaOptions
 {
-    internal class KafkaOptions
-    {
-    }
+    public const string SectionName = "Kafka";
+
+    public string BootstrapServers { get; set; } = "localhost:9092";
+
+    public string ClientId { get; set; } = "facebook-webhook";
 }
