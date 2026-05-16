@@ -1,0 +1,6 @@
+@FB.WebhookService_HostAddress = http://localhost:5254
+
+GET {{FB.WebhookService_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

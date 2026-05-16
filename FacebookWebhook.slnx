@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="FB.BackendAPI/FB.BackendAPI.csproj" />
+  <Project Path="FB.CoreService/FB.CoreService.csproj" />
+  <Project Path="FB.RetryService/FB.RetryService.csproj" />
+  <Project Path="FB.Shared/FB.Shared.csproj" />
+  <Project Path="FB.WebhookService/FB.WebhookService.csproj" />
+</Solution>
