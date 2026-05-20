@@ -4,6 +4,8 @@ using FB.BackendAPI.Auth;
 using FB.BackendAPI.Middleware;
 using FB.BackendAPI.Options;
 using FB.BackendAPI.Services;
+using FB.Shared.Api;
+using FB.Shared.Contracts;
 using FB.Shared.Configuration;
 using FB.Shared.Kafka;
 using Microsoft.OpenApi.Models;
@@ -42,11 +44,16 @@ builder.Services.AddSwaggerGen(options =>
 
 builder.Services.Configure<FacebookGraphOptions>(builder.Configuration.GetSection(FacebookGraphOptions.SectionName));
 builder.Services.Configure<DashboardAuthOptions>(builder.Configuration.GetSection(DashboardAuthOptions.SectionName));
+builder.Services.Configure<KafkaConsumerOptions>(builder.Configuration.GetSection(KafkaConsumerOptions.SectionName));
+builder.Services.Configure<CircuitBreakerOptions>(builder.Configuration.GetSection(CircuitBreakerOptions.SectionName));
 
 builder.Services.AddKafkaProducer(builder.Configuration);
 builder.Services.AddSingleton<ICommandIdempotencyStore, InMemoryCommandIdempotencyStore>();
+builder.Services.AddSingleton<ICommandStatusStore, InMemoryCommandStatusStore>();
+builder.Services.AddSingleton<IFacebookCircuitBreaker, InMemoryFacebookCircuitBreaker>();
 builder.Services.AddSingleton<AdminTokenAuthFilter>();
 builder.Services.AddScoped<IFacebookCommandService, FacebookCommandService>();
+builder.Services.AddHostedService<KafkaCommandConsumerService>();
 
 builder.Services.AddHttpClient<IFacebookGraphService, FacebookGraphService>((serviceProvider, client) =>
 {
@@ -80,5 +87,12 @@ app.MapGet("/health", () => Results.Ok(new
     status = "healthy",
     timestamp = DateTimeOffset.UtcNow
 }));
+
+app.MapGet("/api/command-status/{commandId}", (string commandId, ICommandStatusStore store) =>
+{
+    return store.TryGet(commandId, out var snapshot)
+        ? Results.Ok(snapshot)
+        : Results.NotFound(ApiResponse<object>.Fail("command_not_found", $"Command '{commandId}' was not found."));
+});
 
 app.Run();

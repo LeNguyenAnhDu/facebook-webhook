@@ -12,12 +12,14 @@ public sealed class FacebookGraphService : IFacebookGraphService
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
     private readonly HttpClient _httpClient;
     private readonly FacebookGraphOptions _options;
+    private readonly IFacebookCircuitBreaker _circuitBreaker;
     private readonly ILogger<FacebookGraphService> _logger;
 
-    public FacebookGraphService(HttpClient httpClient, IOptions<FacebookGraphOptions> options, ILogger<FacebookGraphService> logger)
+    public FacebookGraphService(HttpClient httpClient, IOptions<FacebookGraphOptions> options, IFacebookCircuitBreaker circuitBreaker, ILogger<FacebookGraphService> logger)
     {
         _httpClient = httpClient;
         _options = options.Value;
+        _circuitBreaker = circuitBreaker;
         _logger = logger;
     }
 
@@ -68,6 +70,8 @@ public sealed class FacebookGraphService : IFacebookGraphService
         IReadOnlyDictionary<string, string>? body,
         CancellationToken cancellationToken)
     {
+        _circuitBreaker.ThrowIfOpen();
+
         using var request = new HttpRequestMessage(method, relativeUri);
         if (body is not null)
         {
@@ -93,15 +97,18 @@ public sealed class FacebookGraphService : IFacebookGraphService
 
         if (!response.IsSuccessStatusCode)
         {
+            _circuitBreaker.RecordFailure(payload);
             throw BuildFacebookApiException(response.StatusCode, payload);
         }
 
         var result = JsonSerializer.Deserialize<TResponse>(payload, SerializerOptions);
         if (result is null)
         {
-            throw new FacebookApiException("facebook_invalid_response", "Facebook returned an unreadable response.", StatusCodes.Status502BadGateway, payload);
+            _circuitBreaker.RecordFailure(payload);
+            throw new FacebookApiException("facebook_invalid_response", "Facebook returned an unreadable response.", StatusCodes.Status502BadGateway, true, payload);
         }
 
+        _circuitBreaker.RecordSuccess();
         return result;
     }
 
@@ -123,7 +130,15 @@ public sealed class FacebookGraphService : IFacebookGraphService
             _ => StatusCodes.Status502BadGateway
         };
 
-        return new FacebookApiException(errorCode, message, mappedStatus, payload);
+        var isRetryable = statusCode switch
+        {
+            HttpStatusCode.BadRequest => false,
+            HttpStatusCode.Unauthorized => false,
+            HttpStatusCode.Forbidden => false,
+            _ => true
+        };
+
+        return new FacebookApiException(errorCode, message, mappedStatus, isRetryable, payload);
     }
 
     private static string Truncate(string value, int maxLength = 120)
@@ -139,6 +154,7 @@ public sealed class FacebookGraphService : IFacebookGraphService
                 "facebook_page_id_missing",
                 "Default Facebook Page ID is not configured.",
                 StatusCodes.Status500InternalServerError,
+                false,
                 "Set FacebookGraph:DefaultPageId in configuration.");
         }
 

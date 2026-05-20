@@ -33,6 +33,7 @@ public sealed class FacebookCommandService : IFacebookCommandService
             commandId,
             eventId,
             "reply",
+            new ReplyTarget { CommentId = commentId },
             request.Message,
             () => _facebookGraphService.ReplyToCommentAsync(commentId, request.Message, cancellationToken),
             cancellationToken);
@@ -47,6 +48,7 @@ public sealed class FacebookCommandService : IFacebookCommandService
             commandId,
             eventId,
             "hide_comment",
+            new ReplyTarget { CommentId = commentId },
             null,
             () => _facebookGraphService.SetCommentHiddenAsync(commentId, request.IsHidden, cancellationToken),
             cancellationToken);
@@ -56,6 +58,7 @@ public sealed class FacebookCommandService : IFacebookCommandService
         string commandId,
         string eventId,
         string action,
+        ReplyTarget target,
         string? replyText,
         Func<Task<FacebookMutationResponse>> operation,
         CancellationToken cancellationToken)
@@ -74,16 +77,20 @@ public sealed class FacebookCommandService : IFacebookCommandService
         }
         catch (Exception exception)
         {
+            var retryableException = exception as FacebookApiException;
             var failedEvent = new SendFailedEvent
             {
                 CommandId = commandId,
                 EventId = eventId,
                 RetryCount = 0,
+                ErrorCode = retryableException?.ErrorCode ?? "unexpected_error",
                 LastError = exception.Message,
+                IsRetryable = retryableException?.IsRetryable ?? true,
                 NextRetryAt = DateTimeOffset.UtcNow.AddSeconds(1),
                 Payload = new FailedPayload
                 {
                     Action = action,
+                    Target = target,
                     ReplyText = replyText
                 }
             };

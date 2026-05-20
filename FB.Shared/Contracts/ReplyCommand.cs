@@ -10,6 +10,8 @@ public sealed record ReplyCommand
     public string? ReplyText { get; init; }
     public string? Intent { get; init; }
     public string? Sentiment { get; init; }
+    public string? Reason { get; init; }
+    public bool RequiresManualReview { get; init; }
     public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
 }
 

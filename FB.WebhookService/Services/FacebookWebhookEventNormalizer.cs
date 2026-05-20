@@ -89,16 +89,39 @@ public sealed class FacebookWebhookEventNormalizer : IFacebookWebhookEventNormal
     private static DateTimeOffset GetTimestamp(JsonElement value)
     {
         if (value.TryGetProperty("created_time", out var createdTimeNode) &&
-            DateTimeOffset.TryParse(createdTimeNode.GetString(), out var createdAt))
+            TryParseTimestamp(createdTimeNode, out var createdAt))
         {
             return createdAt;
         }
 
-        if (value.TryGetProperty("published", out var publishedNode) && publishedNode.TryGetInt64(out var timestamp))
+        if (value.TryGetProperty("published", out var publishedNode) &&
+            TryParseTimestamp(publishedNode, out var publishedAt))
         {
-            return DateTimeOffset.FromUnixTimeSeconds(timestamp);
+            return publishedAt;
         }
 
         return DateTimeOffset.UtcNow;
+    }
+
+    private static bool TryParseTimestamp(JsonElement node, out DateTimeOffset timestamp)
+    {
+        timestamp = default;
+
+        if (node.ValueKind == JsonValueKind.String &&
+            DateTimeOffset.TryParse(node.GetString(), out timestamp))
+        {
+            return true;
+        }
+
+        if (node.ValueKind == JsonValueKind.Number && node.TryGetInt64(out var unixTime))
+        {
+            timestamp = unixTime > 9_999_999_999
+                ? DateTimeOffset.FromUnixTimeMilliseconds(unixTime)
+                : DateTimeOffset.FromUnixTimeSeconds(unixTime);
+
+            return true;
+        }
+
+        return false;
     }
 }
