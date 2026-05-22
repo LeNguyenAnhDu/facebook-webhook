@@ -9,17 +9,20 @@ public sealed class FacebookCommandService : IFacebookCommandService
 {
     private readonly IFacebookGraphService _facebookGraphService;
     private readonly ICommandIdempotencyStore _idempotencyStore;
+    private readonly ICommentStatusRepository _commentStatusRepository;
     private readonly IKafkaProducer _kafkaProducer;
     private readonly ILogger<FacebookCommandService> _logger;
 
     public FacebookCommandService(
         IFacebookGraphService facebookGraphService,
         ICommandIdempotencyStore idempotencyStore,
+        ICommentStatusRepository commentStatusRepository,
         IKafkaProducer kafkaProducer,
         ILogger<FacebookCommandService> logger)
     {
         _facebookGraphService = facebookGraphService;
         _idempotencyStore = idempotencyStore;
+        _commentStatusRepository = commentStatusRepository;
         _kafkaProducer = kafkaProducer;
         _logger = logger;
     }
@@ -73,11 +76,16 @@ public sealed class FacebookCommandService : IFacebookCommandService
         {
             var response = await operation();
             await _idempotencyStore.MarkProcessedAsync(commandId, cancellationToken);
+            await _commentStatusRepository.UpdateStatusAsync(
+                target.CommentId,
+                action == "reply" ? "replied" : "hidden",
+                cancellationToken);
             return response;
         }
         catch (Exception exception)
         {
             var retryableException = exception as FacebookApiException;
+            await _commentStatusRepository.UpdateStatusAsync(target.CommentId, "failed", cancellationToken);
             var failedEvent = new SendFailedEvent
             {
                 CommandId = commandId,

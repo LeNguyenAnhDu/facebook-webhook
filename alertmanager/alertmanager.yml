@@ -1,5 +1,5 @@
 global:
-  slack_api_url: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+  slack_api_url: "__SLACK_WEBHOOK_URL__"
 route:
   receiver: "slack-notifications"
   group_wait: 10s

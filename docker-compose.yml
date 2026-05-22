@@ -85,20 +85,24 @@ services:
     container_name: fb_api-alertmanager
     depends_on:
       - prometheus
+    environment:
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL}
     ports:
       - "9093:9093"
     volumes:
-      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
-    command:
-      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml.tmpl:ro
+    entrypoint:
+      - /bin/sh
+      - -c
+      - sed "s|__SLACK_WEBHOOK_URL__|$${SLACK_WEBHOOK_URL}|g" /etc/alertmanager/alertmanager.yml.tmpl > /tmp/alertmanager.yml && /bin/alertmanager --config.file=/tmp/alertmanager.yml
   # -- PostgreSQL --
   postgres:
     image: postgres:16
     container_name: fb_api-postgres
     environment:
-      POSTGRES_DB: fb_api_db
-      POSTGRES_USER: fb_api_user
-      POSTGRES_PASSWORD: fb_api_password
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
     volumes:

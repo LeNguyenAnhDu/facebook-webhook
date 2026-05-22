@@ -7,6 +7,7 @@ using FB.BackendAPI.Services;
 using FB.Shared.Api;
 using FB.Shared.Contracts;
 using FB.Shared.Configuration;
+using FB.Shared.Database;
 using FB.Shared.Kafka;
 using Microsoft.OpenApi.Models;
 
@@ -48,7 +49,9 @@ builder.Services.Configure<KafkaConsumerOptions>(builder.Configuration.GetSectio
 builder.Services.Configure<CircuitBreakerOptions>(builder.Configuration.GetSection(CircuitBreakerOptions.SectionName));
 
 builder.Services.AddKafkaProducer(builder.Configuration);
-builder.Services.AddSingleton<ICommandIdempotencyStore, InMemoryCommandIdempotencyStore>();
+builder.Services.AddPostgresDatabase(builder.Configuration);
+builder.Services.AddScoped<ICommandIdempotencyStore, PostgresCommandIdempotencyStore>();
+builder.Services.AddScoped<ICommentStatusRepository, PostgresCommentStatusRepository>();
 builder.Services.AddSingleton<ICommandStatusStore, InMemoryCommandStatusStore>();
 builder.Services.AddSingleton<IFacebookCircuitBreaker, InMemoryFacebookCircuitBreaker>();
 builder.Services.AddSingleton<AdminTokenAuthFilter>();

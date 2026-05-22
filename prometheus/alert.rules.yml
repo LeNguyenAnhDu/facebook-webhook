@@ -1,13 +1,39 @@
 groups:
   - name: kafka_alerts
     rules:
-      # Cảnh báo khi có message mới vào Dead Letter Queue
+      - alert: SendFailedReceived
+        expr: >
+          increase(
+            kafka_topic_partition_current_offset{topic="send_failed"}[1m]
+          ) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Co message moi vao topic send_failed"
+          description: >
+            Topic send_failed vua nhan them message.
+            Backend API da gap loi khi gui request len Facebook Graph API.
+            Kiem tra Kafka UI tai http://localhost:8080 de xem chi tiet message.
+
+      - alert: SendRetryScheduled
+        expr: >
+          increase(
+            kafka_topic_partition_current_offset{topic="send_retry"}[1m]
+          ) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Co message moi vao topic send_retry"
+          description: >
+            Topic send_retry vua nhan them message.
+            Retry Service da len lich thu lai cho lenh gui Facebook that bai.
+
       - alert: DeadLetterQueueReceived
         expr: >
           increase(
-          kafka_topic_partition_current_offset{
-          topic="dead_letter"
-          }[1m]
+            kafka_topic_partition_current_offset{topic="dead_letter"}[1m]
           ) > 0
         for: 0m
         labels:
@@ -16,9 +42,8 @@ groups:
           summary: "Co message moi vao Dead Letter Queue"
           description: >
             Topic dead_letter vua nhan them message.
-            Kiem tra Kafka UI tai http://localhost:8080
-            de xem noi dung va xu ly thu cong.
-      # Cảnh báo khi consumer lag quá cao
+            Kiem tra Kafka UI tai http://localhost:8080 de xem noi dung va xu ly thu cong.
+
       - alert: KafkaConsumerLagHigh
         expr: kafka_consumer_group_lag > 500
         for: 2m
@@ -27,16 +52,12 @@ groups:
         annotations:
           summary: "Consumer lag cao bat thuong"
           description: >
-            Consumer group {{ $labels.consumergroup }}
-            dang lag {{ $value }} message tren topic
-            {{ $labels.topic }}.
-      # Cảnh báo khi không có event nào vào raw_events
+            Consumer group {{ $labels.consumergroup }} dang lag {{ $value }} message tren topic {{ $labels.topic }}.
+
       - alert: WebhookReceiverSilent
         expr: >
           increase(
-          kafka_topic_partition_current_offset{
-          topic="raw_events"
-          }[5m]
+            kafka_topic_partition_current_offset{topic="raw_events"}[5m]
           ) == 0
         for: 10m
         labels:

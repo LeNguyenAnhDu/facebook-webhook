@@ -93,14 +93,17 @@ public sealed class RawEventConsumerService : BackgroundService
         var spamDetector = serviceProvider.GetRequiredService<ISpamDetector>();
         var classifier = serviceProvider.GetRequiredService<IAiClassifier>();
         var ruleEngine = serviceProvider.GetRequiredService<IAutomationRuleEngine>();
+        var commentRepository = serviceProvider.GetRequiredService<ICommentRepository>();
         var producer = serviceProvider.GetRequiredService<IKafkaProducer>();
         var logger = serviceProvider.GetRequiredService<ILogger<RawEventConsumerService>>();
 
         statusStore.Upsert(new EventStatusSnapshot(rawEvent.EventId, ProcessingState.Received, null, null, "Event received from raw_events.", DateTimeOffset.UtcNow));
+        await commentRepository.UpsertReceivedAsync(rawEvent, cancellationToken);
 
         if (IsSelfGeneratedByPage(rawEvent))
         {
             statusStore.Upsert(new EventStatusSnapshot(rawEvent.EventId, ProcessingState.Processed, null, null, "Skipped automation because the comment was created by the page itself.", DateTimeOffset.UtcNow));
+            await commentRepository.UpdateAnalysisAsync(rawEvent.CommentId, null, null, ProcessingState.Processed, cancellationToken);
             logger.LogInformation(
                 "Skipped self-generated page event {EventId}. userId={UserId}, pageId={PageId}, commentId={CommentId}",
                 rawEvent.EventId,
@@ -114,6 +117,7 @@ public sealed class RawEventConsumerService : BackgroundService
         if (activity.EventsLastMinute >= automationOptions.RateLimitPerMinute)
         {
             statusStore.Upsert(new EventStatusSnapshot(rawEvent.EventId, ProcessingState.PendingReview, null, null, "Rate limit triggered, pending review.", DateTimeOffset.UtcNow));
+            await commentRepository.UpdateAnalysisAsync(rawEvent.CommentId, null, null, ProcessingState.PendingReview, cancellationToken);
             return;
         }
 
@@ -143,6 +147,7 @@ public sealed class RawEventConsumerService : BackgroundService
         }
 
         statusStore.Upsert(new EventStatusSnapshot(rawEvent.EventId, decision.State, classification.Intent, classification.Sentiment, decision.Reason, DateTimeOffset.UtcNow));
+        await commentRepository.UpdateAnalysisAsync(rawEvent.CommentId, classification.Intent, classification.Sentiment, decision.State, cancellationToken);
     }
 
     private static bool IsSelfGeneratedByPage(RawEvent rawEvent)
