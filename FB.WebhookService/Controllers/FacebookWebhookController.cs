@@ -57,6 +57,8 @@ public sealed class FacebookWebhookController : ControllerBase
         var payload = await reader.ReadToEndAsync(cancellationToken);
         Request.Body.Position = 0;
 
+        _logger.LogInformation("Facebook webhook payload: {Payload}", payload);
+
         var signature = Request.Headers["X-Hub-Signature-256"].FirstOrDefault();
         if (!_signatureValidator.IsValid(payload, signature))
         {

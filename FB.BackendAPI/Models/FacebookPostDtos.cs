@@ -6,9 +6,9 @@ public sealed record GetPostsRequest(int Limit = 10);
 
 public sealed record CreatePostRequest(string Message);
 
-public sealed record ReplyToCommentRequest(string Message, string? CommandId = null, string? EventId = null);
+public sealed record ReplyToCommentRequest(string Message, string? CommandId = null, string? EventId = null, int RetryCount = 0);
 
-public sealed record HideCommentRequest(bool IsHidden = true, string? CommandId = null, string? EventId = null);
+public sealed record HideCommentRequest(bool IsHidden = true, string? CommandId = null, string? EventId = null, int RetryCount = 0);
 
 public sealed record FacebookPostSummary(
     [property: JsonPropertyName("id")] string Id,

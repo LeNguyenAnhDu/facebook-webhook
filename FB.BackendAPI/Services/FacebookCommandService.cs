@@ -38,6 +38,7 @@ public sealed class FacebookCommandService : IFacebookCommandService
             "reply",
             new ReplyTarget { CommentId = commentId },
             request.Message,
+            request.RetryCount,
             () => _facebookGraphService.ReplyToCommentAsync(commentId, request.Message, cancellationToken),
             cancellationToken);
     }
@@ -53,6 +54,7 @@ public sealed class FacebookCommandService : IFacebookCommandService
             "hide_comment",
             new ReplyTarget { CommentId = commentId },
             null,
+            request.RetryCount,
             () => _facebookGraphService.SetCommentHiddenAsync(commentId, request.IsHidden, cancellationToken),
             cancellationToken);
     }
@@ -63,6 +65,7 @@ public sealed class FacebookCommandService : IFacebookCommandService
         string action,
         ReplyTarget target,
         string? replyText,
+        int retryCount,
         Func<Task<FacebookMutationResponse>> operation,
         CancellationToken cancellationToken)
     {
@@ -90,11 +93,11 @@ public sealed class FacebookCommandService : IFacebookCommandService
             {
                 CommandId = commandId,
                 EventId = eventId,
-                RetryCount = 0,
+                RetryCount = retryCount,
                 ErrorCode = retryableException?.ErrorCode ?? "unexpected_error",
                 LastError = exception.Message,
                 IsRetryable = retryableException?.IsRetryable ?? true,
-                NextRetryAt = DateTimeOffset.UtcNow.AddSeconds(1),
+                NextRetryAt = DateTimeOffset.UtcNow,
                 Payload = new FailedPayload
                 {
                     Action = action,

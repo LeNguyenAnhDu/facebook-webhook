@@ -9,6 +9,8 @@ DotEnvLoader.LoadFromRepositoryRoot();
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 builder.Services.Configure<AiClassificationOptions>(builder.Configuration.GetSection(AiClassificationOptions.SectionName));
 builder.Services.Configure<KafkaConsumerOptions>(builder.Configuration.GetSection(KafkaConsumerOptions.SectionName));
 builder.Services.Configure<AutomationOptions>(builder.Configuration.GetSection(AutomationOptions.SectionName));
@@ -26,12 +28,16 @@ builder.Services.AddHostedService<RawEventConsumerService>();
 
 var app = builder.Build();
 
+app.UseSwagger();
+app.UseSwaggerUI();
+
 app.MapControllers();
 app.MapGet("/health", () => Results.Ok(new
 {
     service = "core-service",
     status = "healthy",
     timestamp = DateTimeOffset.UtcNow
-}));
+}))
+.WithName("GetHealth");
 
 app.Run();

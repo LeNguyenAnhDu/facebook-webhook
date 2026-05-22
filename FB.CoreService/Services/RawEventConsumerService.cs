@@ -51,9 +51,10 @@ public sealed class RawEventConsumerService : BackgroundService
 
             while (!stoppingToken.IsCancellationRequested)
             {
+                ConsumeResult<Ignore, string>? result = null;
                 try
                 {
-                    var result = consumer.Consume(stoppingToken);
+                    result = consumer.Consume(stoppingToken);
                     var rawEvent = JsonSerializer.Deserialize<RawEvent>(result.Message.Value, SerializerOptions);
                     if (rawEvent is null)
                     {
@@ -72,6 +73,14 @@ public sealed class RawEventConsumerService : BackgroundService
 
                     await ProcessAsync(scope.ServiceProvider, rawEvent, _automationOptions, stoppingToken);
                     consumer.Commit(result);
+                }
+                catch (JsonException exception)
+                {
+                    _logger.LogError(exception, "Skipped malformed JSON message from raw_events. Payload={Payload}", result?.Message.Value);
+                    if (result is not null)
+                    {
+                        consumer.Commit(result);
+                    }
                 }
                 catch (OperationCanceledException)
                 {

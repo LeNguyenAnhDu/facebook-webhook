@@ -65,6 +65,14 @@ public sealed class KafkaCommandConsumerService : BackgroundService
                     ProcessReplyCommandAsync(commandService, statusStore, command, stoppingToken).GetAwaiter().GetResult();
                     consumer.Commit(result);
                 }
+                catch (JsonException exception)
+                {
+                    _logger.LogError(exception, "Skipped malformed JSON message from reply_commands. Payload={Payload}", result?.Message.Value);
+                    if (result is not null)
+                    {
+                        consumer.Commit(result);
+                    }
+                }
                 catch (OperationCanceledException)
                 {
                     break;
@@ -110,6 +118,14 @@ public sealed class KafkaCommandConsumerService : BackgroundService
                     ProcessRetryAsync(commandService, statusStore, retryEvent, stoppingToken).GetAwaiter().GetResult();
                     consumer.Commit(result);
                 }
+                catch (JsonException exception)
+                {
+                    _logger.LogError(exception, "Skipped malformed JSON message from send_retry. Payload={Payload}", result?.Message.Value);
+                    if (result is not null)
+                    {
+                        consumer.Commit(result);
+                    }
+                }
                 catch (OperationCanceledException)
                 {
                     break;
@@ -146,7 +162,7 @@ public sealed class KafkaCommandConsumerService : BackgroundService
         {
             await commandService.ReplyToCommentAsync(
                 command.Target.CommentId,
-                new ReplyToCommentRequest(command.ReplyText, command.CommandId, command.EventId),
+                new ReplyToCommentRequest(command.ReplyText, command.CommandId, command.EventId, 0),
                 cancellationToken);
 
             statusStore.Upsert(new CommandStatusSnapshot(command.CommandId, command.EventId, ProcessingState.Replied, command.Action, "Reply sent to Facebook.", DateTimeOffset.UtcNow));
@@ -157,7 +173,7 @@ public sealed class KafkaCommandConsumerService : BackgroundService
         {
             await commandService.HideCommentAsync(
                 command.Target.CommentId,
-                new HideCommentRequest(true, command.CommandId, command.EventId),
+                new HideCommentRequest(true, command.CommandId, command.EventId, 0),
                 cancellationToken);
 
             statusStore.Upsert(new CommandStatusSnapshot(command.CommandId, command.EventId, ProcessingState.Processed, command.Action, "Comment hidden on Facebook.", DateTimeOffset.UtcNow));
@@ -172,7 +188,7 @@ public sealed class KafkaCommandConsumerService : BackgroundService
         {
             await commandService.ReplyToCommentAsync(
                 retryEvent.Payload.Target.CommentId,
-                new ReplyToCommentRequest(retryEvent.Payload.ReplyText, retryEvent.CommandId, retryEvent.EventId),
+                new ReplyToCommentRequest(retryEvent.Payload.ReplyText, retryEvent.CommandId, retryEvent.EventId, retryEvent.RetryCount),
                 cancellationToken);
 
             statusStore.Upsert(new CommandStatusSnapshot(retryEvent.CommandId, retryEvent.EventId, ProcessingState.Replied, retryEvent.Payload.Action, "Reply succeeded after retry.", DateTimeOffset.UtcNow));
@@ -183,7 +199,7 @@ public sealed class KafkaCommandConsumerService : BackgroundService
         {
             await commandService.HideCommentAsync(
                 retryEvent.Payload.Target.CommentId,
-                new HideCommentRequest(true, retryEvent.CommandId, retryEvent.EventId),
+                new HideCommentRequest(true, retryEvent.CommandId, retryEvent.EventId, retryEvent.RetryCount),
                 cancellationToken);
 
             statusStore.Upsert(new CommandStatusSnapshot(retryEvent.CommandId, retryEvent.EventId, ProcessingState.Processed, retryEvent.Payload.Action, "Hide succeeded after retry.", DateTimeOffset.UtcNow));

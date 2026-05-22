@@ -49,9 +49,10 @@ public sealed class SendFailedConsumerService : BackgroundService
 
             while (!stoppingToken.IsCancellationRequested)
             {
+                ConsumeResult<Ignore, string>? result = null;
                 try
                 {
-                    var result = consumer.Consume(stoppingToken);
+                    result = consumer.Consume(stoppingToken);
                     var failedEvent = JsonSerializer.Deserialize<SendFailedEvent>(result.Message.Value, SerializerOptions);
                     if (failedEvent is null)
                     {
@@ -61,6 +62,14 @@ public sealed class SendFailedConsumerService : BackgroundService
 
                     await ProcessAsync(failedEvent, stoppingToken);
                     consumer.Commit(result);
+                }
+                catch (JsonException exception)
+                {
+                    _logger.LogError(exception, "Skipped malformed JSON message from send_failed. Payload={Payload}", result?.Message.Value);
+                    if (result is not null)
+                    {
+                        consumer.Commit(result);
+                    }
                 }
                 catch (OperationCanceledException)
                 {
@@ -79,13 +88,6 @@ public sealed class SendFailedConsumerService : BackgroundService
     {
         var attemptNumber = failedEvent.RetryCount + 1;
         var delaySeconds = _retryOptions.BaseDelaySeconds * (int)Math.Pow(2, failedEvent.RetryCount);
-        var nextRetryAt = DateTimeOffset.UtcNow.AddSeconds(delaySeconds);
-
-        if (failedEvent.NextRetryAt > DateTimeOffset.UtcNow)
-        {
-            var waitDuration = failedEvent.NextRetryAt - DateTimeOffset.UtcNow;
-            await Task.Delay(waitDuration, cancellationToken);
-        }
 
         if (!failedEvent.IsRetryable)
         {
@@ -122,6 +124,9 @@ public sealed class SendFailedConsumerService : BackgroundService
             _logger.LogWarning("Moved command {CommandId} to dead_letter after {RetryCount} retries.", failedEvent.CommandId, failedEvent.RetryCount);
             return;
         }
+
+        var nextRetryAt = DateTimeOffset.UtcNow.AddSeconds(delaySeconds);
+        await Task.Delay(TimeSpan.FromSeconds(delaySeconds), cancellationToken);
 
         var retryEvent = failedEvent with
         {
