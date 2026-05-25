@@ -4,7 +4,7 @@ groups:
       - alert: SendFailedReceived
         expr: >
           increase(
-            kafka_topic_partition_current_offset{topic="send_failed"}[1m]
+            kafka_topic_partition_current_offset{topic="send_failed"}[5m]
           ) > 0
         for: 0m
         labels:
@@ -19,7 +19,7 @@ groups:
       - alert: SendRetryScheduled
         expr: >
           increase(
-            kafka_topic_partition_current_offset{topic="send_retry"}[1m]
+            kafka_topic_partition_current_offset{topic="send_retry"}[5m]
           ) > 0
         for: 0m
         labels:
@@ -33,7 +33,7 @@ groups:
       - alert: DeadLetterQueueReceived
         expr: >
           increase(
-            kafka_topic_partition_current_offset{topic="dead_letter"}[1m]
+            kafka_topic_partition_current_offset{topic="dead_letter"}[5m]
           ) > 0
         for: 0m
         labels:
