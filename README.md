@@ -4,9 +4,57 @@ Hệ thống xử lý webhook Facebook Page theo kiến trúc microservices hư�
 
 ## Kiến trúc hiện tại
 
-![System architecture](./system_architecture.png)
+```mermaid
+flowchart TD
+    FB["Facebook Page"]
 
-Luồng xử lý chính:
+    WEBHOOK["Webhook + Processing<br/>microservice<br/>port: 3001<br/>parse · normalize"]
+
+    KAFKA_RAW["Kafka Broker<br/>topic: raw_events"]
+
+    CORE["Core Service<br/>core-service<br/>port: 3002<br/>AI + Automation"]
+
+    KAFKA_REPLY["Kafka Broker<br/>topic: reply_commands<br/>topic: send_retry"]
+
+    BACKEND["Backend API<br/>backend-api<br/>port: 3000<br/>Send + Idempotency"]
+
+    DB["Database<br/>idempotency key"]
+
+    KAFKA_FAILED["Kafka Broker<br/>topic: send_failed"]
+
+    RETRY["Retry Service<br/>retry-service<br/>port: 3003<br/>exponential backoff"]
+
+    DEAD["Kafka topic:<br/>dead_letter<br/>Prometheus<br/>theo dõi điểm<br/>Alertmanager<br/>bắn Slack"]
+
+    FB -->|HTTP POST| WEBHOOK
+    WEBHOOK -->|publish raw_events| KAFKA_RAW
+    KAFKA_RAW -->|consume raw_events| CORE
+    CORE -->|publish reply_commands| KAFKA_REPLY
+    KAFKA_REPLY -->|consume reply_commands, send_retry| BACKEND
+
+    BACKEND -->|check / save| DB
+    BACKEND -.->|Gửi phản hồi hoặc đăng bài| FB
+
+    BACKEND -->|publish send_failed| KAFKA_FAILED
+    KAFKA_FAILED -->|consume send_failed| RETRY
+
+    RETRY -->|publish send_retry<br/>counter &lt;= N| KAFKA_REPLY
+    RETRY -->|publish dead_letter<br/>counter &gt; N| DEAD
+
+    classDef facebook fill:#ffb3b3,stroke:#cc6666,color:#111;
+    classDef service fill:#c9c3ff,stroke:#6f63c7,color:#111;
+    classDef kafka fill:#ffc27a,stroke:#c47a1c,color:#111;
+    classDef database fill:#b7f7a8,stroke:#4caf50,color:#111;
+    classDef dead fill:#ffb866,stroke:#c47a1c,color:#111;
+
+    class FB facebook;
+    class WEBHOOK,CORE,BACKEND,RETRY service;
+    class KAFKA_RAW,KAFKA_REPLY,KAFKA_FAILED kafka;
+    class DB database;
+    class DEAD dead;
+```
+
+### Luồng xử lý chính
 
 1. Facebook gửi webhook đến `webhook-service` qua endpoint `GET /webhook` để verify và `POST /webhook` để nhận event.
 2. `webhook-service` xác thực token, kiểm tra chữ ký `X-Hub-Signature-256`, normalize payload Facebook thành `RawEvent`, rồi publish vào topic `raw_events`.
@@ -15,6 +63,13 @@ Luồng xử lý chính:
 5. Nếu gọi Graph API lỗi, `backend-api` publish `send_failed`.
 6. `retry-service` consume `send_failed`, tính backoff theo `baseDelaySeconds * 2^retryCount`, publish lại vào `send_retry` hoặc chuyển sang `dead_letter` khi hết số lần retry.
 7. Kafka Exporter, Prometheus và Alertmanager theo dõi offset/alert cho các topic lỗi.
+
+### Nguyên tắc kiến trúc
+
+- Mọi giao tiếp nội bộ giữa các service đi qua Kafka, không gọi HTTP trực tiếp giữa service.
+- Chỉ `backend-api` được gọi Facebook Graph API.
+- Consumer phải xử lý idempotent: `backend-api` dedup bằng `commandId`, các service khác dedup bằng `eventId`.
+- Retry có giới hạn và message lỗi cuối cùng được chuyển sang topic `dead_letter`.
 
 ## Service và port
 
